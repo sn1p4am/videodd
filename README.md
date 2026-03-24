@@ -73,6 +73,20 @@ The `web_app/` service adds a small HTTP layer around `yt-dlp`:
 - `GET /api/downloads/{task_id}/file` serves the completed file
 - `DELETE /api/downloads/{task_id}` removes the history record and the downloaded file if it still exists
 
+### Screenshots
+
+Representative Web UI states:
+
+| Landing page | Extracted media info |
+| --- | --- |
+| ![Web UI landing page](.github/screenshots/webui-home.png) | ![Web UI extracted media state](.github/screenshots/webui-extract.png) |
+| Paste a URL and start from the main download tab. | Review metadata, choose quality, and pick an output format. |
+
+| Live download progress | Download history |
+| --- | --- |
+| ![Web UI live download progress](.github/screenshots/webui-progress.png) | ![Web UI download history](.github/screenshots/webui-history.png) |
+| Track a running job with real-time progress updates over SSE. | Browse completed and failed jobs from the built-in history view. |
+
 ### Environment variables
 
 | Variable | Default | Description |
