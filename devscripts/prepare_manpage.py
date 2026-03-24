@@ -18,7 +18,7 @@ from devscripts.utils import (
 )
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-README_FILE = os.path.join(ROOT_DIR, 'README.md')
+README_FILE, OUTFILE = get_filename_args(has_infile=True)
 
 PREFIX = r'''%yt-dlp(1)
 
@@ -113,7 +113,7 @@ TRANSFORM = compose_functions(filter_excluded_sections, convert_code_blocks, mov
 
 
 def main():
-    write_file(get_filename_args(), PREFIX + TRANSFORM(read_file(README_FILE)))
+    write_file(OUTFILE, PREFIX + TRANSFORM(read_file(README_FILE)))
 
 
 if __name__ == '__main__':

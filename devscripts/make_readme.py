@@ -15,9 +15,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import functools
 import re
 
-from devscripts.utils import read_file, write_file
+from devscripts.utils import get_filename_args, read_file, write_file
 
-README_FILE = 'README.md'
+README_FILE, OUTFILE = get_filename_args(has_infile=True)
+
+USAGE_SECTION = 'USAGE AND OPTIONS'
 
 OPTIONS_START = 'General Options:'
 OPTIONS_END = 'CONFIGURATION'
@@ -86,8 +88,8 @@ PATCHES = (
 
 readme = read_file(README_FILE)
 
-write_file(README_FILE, ''.join((
-    take_section(readme, end=f'## {OPTIONS_START}'),
+write_file(OUTFILE, ''.join((
+    take_section(readme, end=f'# {USAGE_SECTION}', shift=len(f'# {USAGE_SECTION}\n\n')),
     functools.reduce(apply_patch, PATCHES, options),
     take_section(readme, f'# {OPTIONS_END}'),
 )))

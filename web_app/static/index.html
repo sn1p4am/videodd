@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>yt-dlp Web</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: { 800: '#1e1e2e', 700: '#2a2a3e', 600: '#363650', 500: '#45455e' },
+            accent: { DEFAULT: '#6c63ff', light: '#8b83ff' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif; }
+    @keyframes progress-stripe {
+      0% { background-position: 1rem 0; }
+      100% { background-position: 0 0; }
+    }
+    .progress-animated {
+      background-image: linear-gradient(
+        45deg, rgba(255,255,255,.1) 25%, transparent 25%,
+        transparent 50%, rgba(255,255,255,.1) 50%,
+        rgba(255,255,255,.1) 75%, transparent 75%, transparent
+      );
+      background-size: 1rem 1rem;
+      animation: progress-stripe 0.5s linear infinite;
+    }
+  </style>
+</head>
+<body class="dark bg-dark-800 text-gray-200 min-h-screen">
+<div id="app" class="max-w-3xl mx-auto px-4 py-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-white">yt-dlp <span class="text-accent font-normal text-lg">Web</span></h1>
+    <a href="https://github.com/yt-dlp/yt-dlp" target="_blank"
+       class="text-gray-500 hover:text-gray-300 text-sm">GitHub</a>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex border-b border-dark-500 mb-6">
+    <button @click="activeTab='download'"
+            :class="activeTab==='download' ? 'border-accent text-white' : 'border-transparent text-gray-500 hover:text-gray-300'"
+            class="px-4 py-2 border-b-2 font-medium transition-colors">
+      新建下载
+    </button>
+    <button @click="activeTab='history'; loadHistory()"
+            :class="activeTab==='history' ? 'border-accent text-white' : 'border-transparent text-gray-500 hover:text-gray-300'"
+            class="px-4 py-2 border-b-2 font-medium transition-colors">
+      下载历史
+    </button>
+  </div>
+
+  <!-- ==================== Tab 1: New Download ==================== -->
+  <div v-show="activeTab==='download'">
+
+    <!-- URL Input -->
+    <div class="flex gap-2 mb-6">
+      <input v-model="url" @keyup.enter="extractInfo" type="text"
+             placeholder="粘贴 YouTube 视频链接..."
+             class="flex-1 bg-dark-700 border border-dark-500 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-accent transition-colors">
+      <button @click="extractInfo" :disabled="extracting || !url.trim()"
+              class="bg-accent hover:bg-accent-light disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap">
+        {{ extracting ? '获取中...' : '获取信息' }}
+      </button>
+    </div>
+
+    <!-- Error message -->
+    <div v-if="errorMsg" class="bg-red-900/30 border border-red-700 text-red-300 px-4 py-3 rounded-lg mb-4">
+      {{ errorMsg }}
+    </div>
+
+    <!-- Video Info Card -->
+    <div v-if="videoInfo" class="bg-dark-700 rounded-xl p-5 mb-6">
+      <div class="flex gap-4">
+        <img v-if="videoInfo.thumbnail" :src="videoInfo.thumbnail"
+             referrerpolicy="no-referrer"
+             class="w-48 h-28 object-cover rounded-lg flex-shrink-0" alt="">
+        <div class="flex-1 min-w-0">
+          <h2 class="text-white font-semibold text-lg leading-tight mb-2 line-clamp-2">{{ videoInfo.title }}</h2>
+          <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-400">
+            <span v-if="videoInfo.uploader">{{ videoInfo.uploader }}</span>
+            <span v-if="videoInfo.duration_string">{{ videoInfo.duration_string }}</span>
+            <span v-if="videoInfo.view_count">{{ formatNumber(videoInfo.view_count) }} 次播放</span>
+            <span v-if="videoInfo.upload_date">{{ formatDate(videoInfo.upload_date) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Format Selection ===== -->
+      <div class="mt-5 space-y-4">
+
+        <!-- Download Type -->
+        <div>
+          <p class="text-sm text-gray-400 mb-2">下载类型：</p>
+          <div class="flex gap-2">
+            <button @click="downloadType='video'"
+                    :class="downloadType==='video' ? 'bg-accent text-white' : 'bg-dark-600 text-gray-400 hover:text-white'"
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+              视频
+            </button>
+            <button @click="downloadType='audio'"
+                    :class="downloadType==='audio' ? 'bg-accent text-white' : 'bg-dark-600 text-gray-400 hover:text-white'"
+                    class="px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+              </svg>
+              仅音频
+            </button>
+          </div>
+        </div>
+
+        <!-- Video Quality (when video type) -->
+        <div v-if="downloadType==='video'">
+          <p class="text-sm text-gray-400 mb-2">画质选择：</p>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <label v-for="opt in videoQualityOptions" :key="opt.value"
+                   :class="selectedQuality === opt.value ? 'border-accent bg-accent/10 text-white' : 'border-dark-500 text-gray-400 hover:border-gray-500'"
+                   class="border rounded-lg px-3 py-2.5 cursor-pointer transition-colors text-sm">
+              <input type="radio" :value="opt.value" v-model="selectedQuality" class="hidden">
+              <div class="font-medium">{{ opt.label }}</div>
+              <div v-if="opt.desc" class="text-xs mt-0.5 opacity-60">{{ opt.desc }}</div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Video Output Format (when video type) -->
+        <div v-if="downloadType==='video'">
+          <p class="text-sm text-gray-400 mb-2">输出格式：</p>
+          <div class="flex gap-2">
+            <label v-for="fmt in videoFormatOptions" :key="fmt.value"
+                   :class="selectedVideoFormat === fmt.value ? 'border-accent bg-accent/10 text-white' : 'border-dark-500 text-gray-400 hover:border-gray-500'"
+                   class="border rounded-lg px-4 py-2 cursor-pointer transition-colors text-sm font-medium">
+              <input type="radio" :value="fmt.value" v-model="selectedVideoFormat" class="hidden">
+              {{ fmt.label }}
+            </label>
+          </div>
+        </div>
+
+        <!-- Audio Format (when audio type) -->
+        <div v-if="downloadType==='audio'">
+          <p class="text-sm text-gray-400 mb-2">音频格式：</p>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <label v-for="fmt in audioFormatOptions" :key="fmt.value"
+                   :class="selectedAudioFormat === fmt.value ? 'border-accent bg-accent/10 text-white' : 'border-dark-500 text-gray-400 hover:border-gray-500'"
+                   class="border rounded-lg px-3 py-2.5 cursor-pointer transition-colors text-sm text-center">
+              <input type="radio" :value="fmt.value" v-model="selectedAudioFormat" class="hidden">
+              <div class="font-medium">{{ fmt.label }}</div>
+              <div class="text-xs mt-0.5 opacity-60">{{ fmt.desc }}</div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Available formats from video (collapsible) -->
+        <details v-if="videoInfo.formats && videoInfo.formats.length > 0" class="group">
+          <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-400 select-none">
+            查看全部 {{ videoInfo.formats.length }} 个可用流 (高级)
+          </summary>
+          <div class="mt-2 max-h-48 overflow-y-auto rounded-lg bg-dark-800 p-3">
+            <table class="w-full text-xs text-gray-500">
+              <thead>
+                <tr class="text-left border-b border-dark-500">
+                  <th class="pb-1 pr-2">ID</th>
+                  <th class="pb-1 pr-2">格式</th>
+                  <th class="pb-1 pr-2">分辨率</th>
+                  <th class="pb-1 pr-2">编码</th>
+                  <th class="pb-1">大小</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="f in videoInfo.formats" :key="f.format_id" class="border-b border-dark-700/50">
+                  <td class="py-1 pr-2 font-mono">{{ f.format_id }}</td>
+                  <td class="py-1 pr-2">{{ f.ext }}</td>
+                  <td class="py-1 pr-2">{{ f.resolution || '-' }}</td>
+                  <td class="py-1 pr-2">
+                    <span v-if="f.vcodec && f.vcodec !== 'none'" class="text-blue-400">V</span>
+                    <span v-if="f.acodec && f.acodec !== 'none'" class="text-green-400">A</span>
+                    <span class="ml-1">{{ f.format_note }}</span>
+                  </td>
+                  <td class="py-1">{{ f.filesize ? formatBytes(f.filesize) : '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+
+      <!-- Download Button -->
+      <button @click="startDownload" :disabled="downloading"
+              class="mt-5 w-full bg-accent hover:bg-accent-light disabled:opacity-50 text-white py-3 rounded-lg font-medium transition-colors">
+        {{ downloading ? '正在下载...' : '开始下载' }}
+      </button>
+    </div>
+
+    <!-- Progress Bar -->
+    <div v-if="downloading" class="bg-dark-700 rounded-xl p-5 mb-6">
+      <div class="flex justify-between text-sm mb-2">
+        <span class="text-gray-300">{{ progressStatus }}</span>
+        <span class="text-white font-mono">{{ progress.percent?.toFixed(1) || 0 }}%</span>
+      </div>
+      <div class="w-full bg-dark-500 rounded-full h-3 overflow-hidden">
+        <div class="h-full bg-gradient-to-r from-accent to-purple-500 rounded-full transition-all duration-300"
+             :class="{ 'progress-animated': progress.status === 'downloading' }"
+             :style="{ width: (progress.percent || 0) + '%' }">
+        </div>
+      </div>
+      <div class="flex justify-between text-xs text-gray-500 mt-2">
+        <span v-if="progress.speed">{{ formatSpeed(progress.speed) }}</span>
+        <span v-if="progress.eta">剩余 {{ progress.eta }} 秒</span>
+        <span v-if="progress.downloaded_bytes">
+          {{ formatBytes(progress.downloaded_bytes) }} / {{ formatBytes(progress.total_bytes) }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Download Complete -->
+    <div v-if="completed" class="bg-dark-700 rounded-xl p-5 mb-6 border border-green-800">
+      <div class="flex items-center gap-3 mb-3">
+        <svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        <span class="text-green-300 font-medium">下载完成</span>
+      </div>
+      <p class="text-gray-400 text-sm mb-1">{{ completed.filename }}</p>
+      <p v-if="completed.filesize" class="text-gray-500 text-xs mb-4">{{ formatBytes(completed.filesize) }}</p>
+      <div class="flex gap-3">
+        <a :href="'/api/downloads/' + completed.task_id + '/file'" download
+           class="bg-green-700 hover:bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+          保存到本地
+        </a>
+        <button @click="reset"
+                class="bg-dark-500 hover:bg-dark-600 text-gray-300 px-5 py-2 rounded-lg text-sm transition-colors">
+          继续下载
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Tab 2: History ==================== -->
+  <div v-show="activeTab==='history'">
+    <div v-if="history.length === 0" class="text-center text-gray-500 py-12">
+      暂无下载记录
+    </div>
+    <div v-else class="space-y-3">
+      <div v-for="item in history" :key="item.id"
+           class="bg-dark-700 rounded-lg p-4 flex items-center gap-4">
+        <img v-if="item.thumbnail" :src="item.thumbnail"
+             referrerpolicy="no-referrer"
+             class="w-20 h-12 object-cover rounded flex-shrink-0" alt="">
+        <div v-else class="w-20 h-12 bg-dark-500 rounded flex-shrink-0"></div>
+        <div class="flex-1 min-w-0">
+          <p class="text-white text-sm truncate">{{ item.title || item.filename || '未知' }}</p>
+          <div class="flex gap-3 text-xs text-gray-500 mt-1">
+            <span :class="{
+              'text-green-400': item.status === 'complete',
+              'text-yellow-400': item.status === 'downloading',
+              'text-red-400': item.status === 'error'
+            }">{{ statusText(item.status) }}</span>
+            <span v-if="item.filesize">{{ formatBytes(item.filesize) }}</span>
+            <span>{{ item.created_at }}</span>
+          </div>
+          <p v-if="item.error" class="text-red-400 text-xs mt-1 truncate">{{ item.error }}</p>
+        </div>
+        <div class="flex gap-2 flex-shrink-0">
+          <a v-if="item.status === 'complete'" :href="'/api/downloads/' + item.id + '/file'" download
+             class="text-accent hover:text-accent-light text-sm" title="下载">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </a>
+          <button @click="deleteItem(item.id)" class="text-gray-600 hover:text-red-400 text-sm" title="删除">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
+
+createApp({
+  setup() {
+    const activeTab = ref('download');
+    const url = ref('');
+    const videoInfo = ref(null);
+    const extracting = ref(false);
+    const downloading = ref(false);
+    const errorMsg = ref('');
+
+    // Format selection state
+    const downloadType = ref('video');       // 'video' or 'audio'
+    const selectedQuality = ref('best');     // 'best', '1080', '720', '480', '360'
+    const selectedVideoFormat = ref('mp4');  // 'mp4', 'webm', 'auto'
+    const selectedAudioFormat = ref('mp3');  // 'mp3', 'm4a', 'opus', 'flac'
+
+    const progress = reactive({ status: '', percent: 0, speed: 0, eta: 0, downloaded_bytes: 0, total_bytes: 0 });
+    const completed = ref(null);
+    const history = ref([]);
+    let eventSource = null;
+
+    const videoQualityOptions = computed(() => {
+      const base = [
+        { label: '最佳画质', value: 'best', desc: '自动选择最高清' },
+        { label: '1080p', value: '1080', desc: 'Full HD' },
+        { label: '720p', value: '720', desc: 'HD' },
+        { label: '480p', value: '480', desc: 'SD' },
+        { label: '360p', value: '360', desc: '流量节省' },
+      ];
+      // Check which resolutions are actually available
+      if (videoInfo.value && videoInfo.value.formats) {
+        const heights = new Set();
+        videoInfo.value.formats.forEach(f => {
+          if (f.resolution && f.vcodec && f.vcodec !== 'none') {
+            const h = parseInt(f.resolution.split('x')[1] || f.resolution);
+            if (h) heights.add(h);
+          }
+        });
+        if (heights.size > 0) {
+          return base.map(opt => {
+            if (opt.value === 'best') return { ...opt, desc: `最高 ${Math.max(...heights)}p` };
+            const h = parseInt(opt.value);
+            const available = [...heights].some(ah => ah >= h);
+            return { ...opt, desc: available ? opt.desc : `${opt.desc} (可能不可用)` };
+          });
+        }
+      }
+      return base;
+    });
+
+    const videoFormatOptions = [
+      { label: 'MP4', value: 'mp4' },
+      { label: 'WebM', value: 'webm' },
+      { label: '自动', value: 'auto' },
+    ];
+
+    const audioFormatOptions = [
+      { label: 'MP3', value: 'mp3', desc: '通用兼容' },
+      { label: 'M4A', value: 'm4a', desc: 'Apple 友好' },
+      { label: 'Opus', value: 'opus', desc: '高质量小体积' },
+      { label: 'FLAC', value: 'flac', desc: '无损音质' },
+    ];
+
+    const progressStatus = computed(() => {
+      const s = progress.status;
+      if (s === 'downloading') return '正在下载...';
+      if (s === 'merging') return '正在合并音视频...';
+      if (s === 'processing') return '正在转码处理...';
+      if (s === 'pending') return '等待开始...';
+      return '处理中...';
+    });
+
+    function getFormatStr() {
+      if (downloadType.value === 'audio') return 'bestaudio/best';
+
+      const q = selectedQuality.value;
+      const vfmt = selectedVideoFormat.value;
+
+      let formatStr;
+      if (q === 'best') {
+        formatStr = 'bestvideo+bestaudio/best';
+      } else {
+        formatStr = `bestvideo[height<=${q}]+bestaudio/best[height<=${q}]`;
+      }
+
+      // If user wants a specific container, add ext filter
+      if (vfmt !== 'auto') {
+        if (q === 'best') {
+          formatStr = `bestvideo[ext=${vfmt}]+bestaudio/bestvideo+bestaudio/best`;
+        } else {
+          formatStr = `bestvideo[height<=${q}][ext=${vfmt}]+bestaudio/bestvideo[height<=${q}]+bestaudio/best[height<=${q}]`;
+        }
+      }
+      return formatStr;
+    }
+
+    function getPostprocessors() {
+      if (downloadType.value === 'audio') {
+        return { audio_only: true, audio_format: selectedAudioFormat.value };
+      }
+      const pp = { audio_only: false, audio_format: 'mp3' };
+      // If user wants MP4 output, add remux postprocessor
+      if (selectedVideoFormat.value === 'mp4') {
+        pp.remux_video = 'mp4';
+      } else if (selectedVideoFormat.value === 'webm') {
+        pp.remux_video = 'webm';
+      }
+      return pp;
+    }
+
+    async function extractInfo() {
+      if (!url.value.trim()) return;
+      errorMsg.value = '';
+      videoInfo.value = null;
+      completed.value = null;
+      extracting.value = true;
+      try {
+        const res = await fetch('/api/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: url.value.trim() }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '提取失败');
+        videoInfo.value = data;
+      } catch (e) {
+        errorMsg.value = e.message || '获取视频信息失败';
+      } finally {
+        extracting.value = false;
+      }
+    }
+
+    async function startDownload() {
+      errorMsg.value = '';
+      downloading.value = true;
+      completed.value = null;
+      Object.assign(progress, { status: 'pending', percent: 0, speed: 0, eta: 0, downloaded_bytes: 0, total_bytes: 0 });
+
+      const pp = getPostprocessors();
+
+      try {
+        const res = await fetch('/api/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: url.value.trim(),
+            format: getFormatStr(),
+            audio_only: pp.audio_only,
+            audio_format: pp.audio_format,
+            remux_video: pp.remux_video || '',
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '创建下载任务失败');
+        connectSSE(data.task_id);
+      } catch (e) {
+        errorMsg.value = e.message || '下载失败';
+        downloading.value = false;
+      }
+    }
+
+    function connectSSE(taskId) {
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource(`/api/downloads/${taskId}/progress`);
+      eventSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        Object.assign(progress, data);
+        if (data.status === 'complete') {
+          downloading.value = false;
+          completed.value = { ...data, task_id: taskId };
+          eventSource.close();
+          eventSource = null;
+        } else if (data.status === 'error') {
+          downloading.value = false;
+          errorMsg.value = data.error || '下载过程中出错';
+          eventSource.close();
+          eventSource = null;
+        }
+      };
+      eventSource.onerror = () => {
+        if (!downloading.value && eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+      };
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await fetch('/api/downloads');
+        history.value = await res.json();
+      } catch (e) { /* ignore */ }
+    }
+
+    async function deleteItem(id) {
+      try {
+        await fetch(`/api/downloads/${id}`, { method: 'DELETE' });
+        history.value = history.value.filter(h => h.id !== id);
+      } catch (e) { /* ignore */ }
+    }
+
+    function reset() {
+      videoInfo.value = null;
+      completed.value = null;
+      downloading.value = false;
+      errorMsg.value = '';
+      url.value = '';
+      Object.assign(progress, { status: '', percent: 0, speed: 0, eta: 0, downloaded_bytes: 0, total_bytes: 0 });
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB'];
+      let i = 0, val = bytes;
+      while (val >= 1024 && i < units.length - 1) { val /= 1024; i++; }
+      return val.toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+    }
+
+    function formatSpeed(speed) {
+      if (!speed) return '';
+      return formatBytes(speed) + '/s';
+    }
+
+    function formatNumber(n) {
+      if (!n) return '';
+      if (n >= 1e8) return (n / 1e8).toFixed(1) + ' 亿';
+      if (n >= 1e4) return (n / 1e4).toFixed(1) + ' 万';
+      return n.toLocaleString();
+    }
+
+    function formatDate(d) {
+      if (!d || d.length !== 8) return d;
+      return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
+    }
+
+    function statusText(s) {
+      const map = { pending: '等待中', downloading: '下载中', merging: '合并中', processing: '处理中', complete: '已完成', error: '失败' };
+      return map[s] || s;
+    }
+
+    onMounted(() => { loadHistory(); });
+    onUnmounted(() => { if (eventSource) eventSource.close(); });
+
+    return {
+      activeTab, url, videoInfo, extracting, downloading, errorMsg,
+      downloadType, selectedQuality, selectedVideoFormat, selectedAudioFormat,
+      videoQualityOptions, videoFormatOptions, audioFormatOptions,
+      progress, progressStatus, completed, history,
+      extractInfo, startDownload, loadHistory, deleteItem, reset,
+      formatBytes, formatSpeed, formatNumber, formatDate, statusText,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

@@ -3,7 +3,7 @@ all-extra: lazy-extractors yt-dlp-extra doc pypi-files
 clean: clean-test clean-dist
 clean-all: clean clean-cache
 completions: completion-bash completion-fish completion-zsh
-doc: README.md CONTRIBUTING.md CONTRIBUTORS issuetemplates supportedsites
+doc: README.txt yt-dlp.1 CONTRIBUTING.md CONTRIBUTORS issuetemplates supportedsites
 ot: offlinetest
 tar: yt-dlp.tar.gz
 
@@ -129,8 +129,8 @@ yt-dlp: yt-dlp.zip
 	chmod a+x yt-dlp
 	rm -rf zip
 
-README.md: $(PY_CODE_FILES) devscripts/make_readme.py
-	COLUMNS=80 $(PYTHON) yt_dlp/__main__.py --ignore-config --help | $(PYTHON) devscripts/make_readme.py
+README.generated.md: $(PY_CODE_FILES) devscripts/make_readme.py README.md
+	COLUMNS=80 $(PYTHON) yt_dlp/__main__.py --ignore-config --help | $(PYTHON) devscripts/make_readme.py README.md README.generated.md
 
 CONTRIBUTING.md: README.md devscripts/make_contributing.py
 	$(PYTHON) devscripts/make_contributing.py README.md CONTRIBUTING.md
@@ -146,11 +146,11 @@ issuetemplates: devscripts/make_issue_template.py .github/ISSUE_TEMPLATE_tmpl/1_
 supportedsites:
 	$(PYTHON) devscripts/make_supportedsites.py supportedsites.md
 
-README.txt: README.md
-	pandoc -f $(MARKDOWN) -t plain README.md -o README.txt
+README.txt: README.generated.md
+	pandoc -f $(MARKDOWN) -t plain README.generated.md -o README.txt
 
-yt-dlp.1: README.md devscripts/prepare_manpage.py
-	$(PYTHON) devscripts/prepare_manpage.py yt-dlp.1.temp.md
+yt-dlp.1: README.generated.md devscripts/prepare_manpage.py
+	$(PYTHON) devscripts/prepare_manpage.py README.generated.md yt-dlp.1.temp.md
 	pandoc -s -f $(MARKDOWN) -t man yt-dlp.1.temp.md -o yt-dlp.1
 	rm -f yt-dlp.1.temp.md
 
@@ -182,11 +182,15 @@ yt-dlp.tar.gz: all
 		--exclude '__pycache__' \
 		--exclude '.*_cache' \
 		--exclude '.git' \
+		--exclude 'web_app/downloads' \
+		--exclude 'web_app/*.db' \
+		--exclude 'web_app/.env' \
+		--exclude 'web_app/*.log' \
 		-- \
 		README.md supportedsites.md Changelog.md LICENSE \
 		CONTRIBUTING.md Maintainers.md CONTRIBUTORS AUTHORS \
 		Makefile yt-dlp.1 README.txt completions .gitignore \
-		yt-dlp yt_dlp pyproject.toml devscripts test
+		yt-dlp yt_dlp pyproject.toml devscripts test web_app
 
 AUTHORS: Changelog.md
 	@if [ -d '.git' ] && command -v git > /dev/null ; then \

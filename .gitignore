@@ -96,6 +96,7 @@ uv.lock
 
 # Generated
 AUTHORS
+README.generated.md
 README.txt
 .mailmap
 *.1
@@ -133,3 +134,9 @@ yt-dlp-plugins
 
 # Packages
 yt_dlp_ejs/
+
+# web_app runtime artifacts
+web_app/downloads/
+web_app/*.db
+web_app/.env
+web_app/*.log

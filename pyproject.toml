@@ -112,6 +112,7 @@ include = [
     "/yt_dlp",
     "/devscripts",
     "/test",
+    "/web_app",
     "/.gitignore",  # included by default, needed for auto-excludes
     "/Changelog.md",
     "/LICENSE",  # included as license
@@ -128,7 +129,10 @@ artifacts = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["yt_dlp"]
+packages = [
+    "yt_dlp",
+    "web_app",
+]
 artifacts = [
     "/yt_dlp/extractor/lazy_extractors.py",
 ]
