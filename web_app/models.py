@@ -2,6 +2,15 @@ from pydantic import BaseModel
 from typing import Optional
 
 
+class LoginRequest(BaseModel):
+    password: str
+
+
+class AuthStatusResponse(BaseModel):
+    auth_enabled: bool
+    authenticated: bool
+
+
 class ExtractRequest(BaseModel):
     url: str
 

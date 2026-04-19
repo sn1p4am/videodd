@@ -141,3 +141,7 @@ web_app/downloads/
 web_app/*.db
 web_app/.env
 web_app/*.log
+
+# compose deployment artifacts
+data/
+.env

@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+venv
+build
+dist
+zip
+tmp
+bundle
+test
+web_app/downloads
+web_app/*.db
+data
+.playwright-mcp
+.codex
+*.pyc
+__pycache__

@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shutil
 import uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -7,7 +8,13 @@ from urllib.parse import urlparse
 
 from yt_dlp import YoutubeDL
 
-from .config import DOWNLOAD_DIR, MAX_CONCURRENT_DOWNLOADS
+from .config import (
+    DOWNLOAD_DIR,
+    MAX_CONCURRENT_DOWNLOADS,
+    NODE_PATH,
+    PROXY_MODE,
+    PROXY_URL,
+)
 from .database import create_download, update_download
 
 # Global state
@@ -66,10 +73,16 @@ def _base_ydl_opts(url: str = "") -> dict:
     opts = {
         "quiet": True,
         "no_warnings": True,
-        "js_runtimes": {"node": {"path": os.path.expanduser("~/.nvm/versions/node/v22.22.0/bin/node")}},
     }
-    if not url or _needs_proxy(url):
-        opts["proxy"] = "http://127.0.0.1:7897"
+
+    node_path = NODE_PATH or shutil.which("node") or ""
+    if node_path:
+        opts["js_runtimes"] = {"node": {"path": node_path}}
+
+    if PROXY_URL:
+        if PROXY_MODE == "always" or (PROXY_MODE != "never" and (not url or _needs_proxy(url))):
+            opts["proxy"] = PROXY_URL
+
     return opts
 
 

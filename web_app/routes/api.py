@@ -1,14 +1,15 @@
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
+from ..auth import require_admin
 from ..models import (
     DownloadRequest, DownloadResponse, ExtractRequest, ExtractResponse,
 )
 from .. import downloader, database
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(require_admin)])
 
 
 @router.post("/extract", response_model=ExtractResponse)

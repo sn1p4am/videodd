@@ -24,10 +24,27 @@ This fork is optimized for a simple workflow:
 
 - Python 3.10+
 - `ffmpeg` / `ffprobe` recommended; required for merge, remux, and audio extraction tasks handled by `yt-dlp`
-- A Node runtime available at `~/.nvm/versions/node/v22.22.0/bin/node` (current implementation detail in `web_app/downloader.py`)
-- For non-domestic sites, the current `web_app` code routes requests through `http://127.0.0.1:7897`
+- A Node runtime available in `PATH` or via `YTDLP_NODE_PATH`
+- Optional proxy if you want to route non-domestic sites through `YTDLP_PROXY_URL`
+- For public deployment, set `YTDLP_ADMIN_PASSWORD` and `YTDLP_SESSION_SECRET`
 
 ### Run from this repository
+
+```bash
+./start-web.sh
+```
+
+The helper script will reuse an existing Python environment when possible, create `.venv/` only if dependencies are missing, and then start the FastAPI app.
+
+If you want password protection locally:
+
+```bash
+YTDLP_ADMIN_PASSWORD='change-me' \
+YTDLP_SESSION_SECRET='replace-with-a-random-secret' \
+./start-web.sh
+```
+
+Manual steps if you prefer:
 
 ```bash
 python -m pip install -e ".[default]"
@@ -35,7 +52,25 @@ python -m pip install -r web_app/requirements.txt
 python -m web_app
 ```
 
-Open `http://localhost:8080` in your browser.
+Open `http://localhost:8081` in your browser.
+
+If `YTDLP_ADMIN_PASSWORD` is set, unauthenticated users are redirected to `/login` and must enter the admin password before the main page is shown.
+
+### Run with Docker Compose
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Then open `http://localhost:8081`.
+
+The Compose setup:
+
+- builds the included `Dockerfile`
+- installs `ffmpeg` and `nodejs` in the container
+- persists downloads and the SQLite database under `./data`
+- requires an admin password and session secret from `.env`
 
 ### Current behavior to know about
 
@@ -94,14 +129,32 @@ Representative Web UI states:
 | `YTDLP_DOWNLOAD_DIR` | `web_app/downloads` | Directory used for downloaded files |
 | `YTDLP_DB_PATH` | `web_app/ytdlp_web.db` | SQLite database path for download history |
 | `YTDLP_HOST` | `0.0.0.0` | FastAPI bind host |
-| `YTDLP_PORT` | `8080` | FastAPI bind port |
+| `YTDLP_PORT` | `8081` | FastAPI bind port |
 | `YTDLP_MAX_CONCURRENT` | `3` | Maximum concurrent background downloads |
+| `YTDLP_NODE_PATH` | auto-detect | Node runtime path or executable name |
+| `YTDLP_PROXY_URL` | unset | Proxy URL used for downloads when enabled |
+| `YTDLP_PROXY_MODE` | `foreign-only` | `foreign-only`, `always`, or `never` |
+| `YTDLP_ADMIN_PASSWORD` | unset | Enables the admin login page and API protection |
+| `YTDLP_SESSION_SECRET` | dev fallback | Secret used to sign the login session cookie |
+| `YTDLP_SESSION_SECURE` | `false` | Set `true` when serving over HTTPS |
+| `YTDLP_SESSION_MAX_AGE` | `43200` | Session lifetime in seconds |
 
 Example:
 
 ```bash
-YTDLP_PORT=9090 YTDLP_DOWNLOAD_DIR=/data/downloads python -m web_app
+YTDLP_PORT=9090 \
+YTDLP_DOWNLOAD_DIR=/data/downloads \
+YTDLP_ADMIN_PASSWORD='change-me' \
+YTDLP_SESSION_SECRET='replace-me' \
+python -m web_app
 ```
+
+### Public deployment notes
+
+- Put the service behind HTTPS before exposing it on the public internet.
+- Change both `YTDLP_ADMIN_PASSWORD` and `YTDLP_SESSION_SECRET` from the example values.
+- Keep `YTDLP_SESSION_SECURE=true` in Docker deployments that are accessed over HTTPS.
+- If you need an outbound proxy, set `YTDLP_PROXY_URL`; otherwise leave it empty.
 
 ## Project structure
 
@@ -113,7 +166,9 @@ YTDLP_PORT=9090 YTDLP_DOWNLOAD_DIR=/data/downloads python -m web_app
 │   ├── downloader.py       # yt-dlp integration and background jobs
 │   ├── database.py         # SQLite persistence
 │   ├── routes/             # API and SSE endpoints
-│   └── static/index.html   # Browser UI
+│   └── static/             # Login page and browser UI
+├── Dockerfile              # Container image for the Web UI
+├── compose.yml             # Compose deployment for public/private hosting
 ├── supportedsites.md       # Supported extractor list
 ├── CONTRIBUTING.md         # Upstream-oriented contribution guide
 └── README.md               # This fork-specific overview

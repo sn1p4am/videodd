@@ -1,0 +1,36 @@
+services:
+  yt-dlp-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${YTDLP_PUBLIC_PORT:-8081}:8081"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      YTDLP_HOST: 0.0.0.0
+      YTDLP_PORT: 8081
+      YTDLP_DOWNLOAD_DIR: /data/downloads
+      YTDLP_DB_PATH: /data/ytdlp_web.db
+      YTDLP_MAX_CONCURRENT: ${YTDLP_MAX_CONCURRENT:-3}
+      YTDLP_ADMIN_PASSWORD: ${YTDLP_ADMIN_PASSWORD:?set in .env}
+      YTDLP_SESSION_SECRET: ${YTDLP_SESSION_SECRET:?set in .env}
+      YTDLP_SESSION_SECURE: ${YTDLP_SESSION_SECURE:-true}
+      YTDLP_PROXY_URL: ${YTDLP_PROXY_URL:-}
+      YTDLP_PROXY_MODE: ${YTDLP_PROXY_MODE:-foreign-only}
+      YTDLP_NODE_PATH: ${YTDLP_NODE_PATH:-node}
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/healthz', timeout=5)"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

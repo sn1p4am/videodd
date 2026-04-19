@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理员登录 | yt-dlp Web</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: { 900: '#111322', 800: '#171a2b', 700: '#20253a', 600: '#2b3150', 500: '#394167' },
+            accent: { DEFAULT: '#ff7a18', light: '#ff9b4d' }
+          },
+          boxShadow: {
+            glow: '0 20px 80px rgba(255, 122, 24, 0.18)'
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="dark min-h-screen bg-[radial-gradient(circle_at_top,_rgba(255,122,24,0.18),_transparent_38%),linear-gradient(180deg,_#111322,_#0b0d17)] text-gray-100">
+  <main class="min-h-screen px-4 py-8">
+    <div class="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl items-center justify-center">
+      <section class="grid w-full overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-glow backdrop-blur md:grid-cols-[1.15fr_0.85fr]">
+        <div class="border-b border-white/10 px-8 py-10 md:border-b-0 md:border-r">
+          <div class="mb-8 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.3em] text-orange-200/80">
+            Restricted Access
+          </div>
+          <h1 class="max-w-md text-4xl font-semibold leading-tight text-white">yt-dlp Web 管理入口</h1>
+          <p class="mt-4 max-w-lg text-sm leading-7 text-gray-300">
+            这是对外部署使用的管理员入口。输入部署时配置的管理员密码后，才可以进入下载、历史记录和文件获取页面。
+          </p>
+          <div class="mt-10 grid gap-4 text-sm text-gray-300 sm:grid-cols-2">
+            <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p class="font-medium text-white">受保护范围</p>
+              <p class="mt-2 leading-6 text-gray-400">功能页、API、SSE 进度流和下载文件链接都会要求已登录会话。</p>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p class="font-medium text-white">部署建议</p>
+              <p class="mt-2 leading-6 text-gray-400">公网使用时请同时启用 HTTPS，并设置强随机密码和会话密钥。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-8 py-10">
+          <div class="mx-auto max-w-sm">
+            <p class="text-sm uppercase tracking-[0.24em] text-gray-500">Admin Sign In</p>
+            <h2 class="mt-3 text-2xl font-semibold text-white">输入管理员密码</h2>
+            <p class="mt-3 text-sm leading-6 text-gray-400">密码验证成功后会创建一个会话 Cookie，用于访问 Web 功能页面。</p>
+
+            <form id="login-form" class="mt-8 space-y-4">
+              <label class="block">
+                <span class="mb-2 block text-sm text-gray-300">管理员密码</span>
+                <input id="password" name="password" type="password" autocomplete="current-password" required
+                       class="w-full rounded-2xl border border-white/10 bg-dark-700 px-4 py-3 text-white outline-none transition focus:border-accent"
+                       placeholder="请输入管理员密码">
+              </label>
+              <div id="error" class="hidden rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"></div>
+              <button id="submit" type="submit"
+                      class="w-full rounded-2xl bg-accent px-4 py-3 font-medium text-white transition hover:bg-accent-light disabled:cursor-not-allowed disabled:opacity-60">
+                进入功能页
+              </button>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const passwordInput = document.getElementById('password');
+    const submitButton = document.getElementById('submit');
+    const errorBox = document.getElementById('error');
+
+    async function checkStatus() {
+      const response = await fetch('/api/auth/status');
+      const data = await response.json();
+      if (!data.auth_enabled || data.authenticated) {
+        window.location.replace('/');
+      }
+    }
+
+    function setError(message) {
+      if (!message) {
+        errorBox.textContent = '';
+        errorBox.classList.add('hidden');
+        return;
+      }
+      errorBox.textContent = message;
+      errorBox.classList.remove('hidden');
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setError('');
+      submitButton.disabled = true;
+      submitButton.textContent = '验证中...';
+
+      try {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: passwordInput.value }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || '登录失败');
+        }
+        if (data.authenticated) {
+          window.location.replace('/');
+          return;
+        }
+        throw new Error('登录状态异常');
+      } catch (error) {
+        setError(error.message || '登录失败');
+        submitButton.disabled = false;
+        submitButton.textContent = '进入功能页';
+        passwordInput.focus();
+        passwordInput.select();
+      }
+    });
+
+    checkStatus().catch(() => {});
+  </script>
+</body>
+</html>

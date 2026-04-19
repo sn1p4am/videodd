@@ -1,15 +1,16 @@
 import asyncio
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
+from ..auth import require_admin
 from .. import downloader
 
 router = APIRouter()
 
 
-@router.get("/api/downloads/{task_id}/progress")
+@router.get("/api/downloads/{task_id}/progress", dependencies=[Depends(require_admin)])
 async def download_progress(task_id: str):
     async def event_generator():
         # Send current state immediately
