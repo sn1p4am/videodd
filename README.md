@@ -116,6 +116,48 @@ Persistent data lives in `./data`:
 
 If you expose the service publicly, put it behind HTTPS and keep `YTDLP_SESSION_SECURE=true`.
 
+### Domain And Nginx Proxy Manager
+
+If you use Nginx Proxy Manager on the same server and want to bind a domain:
+
+1. Keep this service listening on port `8081`
+2. In Nginx Proxy Manager, create a new Proxy Host
+3. Set your domain name, for example `video.example.com`
+4. Forward to:
+   - Scheme: `http`
+   - Forward Hostname / IP: your server IP or `127.0.0.1`
+   - Forward Port: `8081`
+5. In the SSL tab, request or attach a certificate
+6. Access the site from `https://your-domain`
+
+Recommended `.env` values for a domain deployment:
+
+```dotenv
+YTDLP_PUBLIC_PORT=8081
+YTDLP_ADMIN_PASSWORD=use-a-strong-password
+YTDLP_SESSION_SECRET=use-a-long-random-secret
+YTDLP_SESSION_SECURE=true
+YTDLP_ALLOWED_HOSTS=video.example.com
+YTDLP_SESSION_DOMAIN=video.example.com
+```
+
+Notes:
+
+- `YTDLP_ALLOWED_HOSTS` is optional but recommended. It rejects unexpected `Host` headers and limits the app to your real domain.
+- `YTDLP_SESSION_DOMAIN` is optional. Leave it empty unless you want to pin the login cookie to a specific domain.
+- If you use multiple hostnames, separate them with commas:
+
+```dotenv
+YTDLP_ALLOWED_HOSTS=video.example.com,www.video.example.com
+```
+
+- After changing `.env`, rebuild and restart:
+
+```bash
+docker compose down
+docker compose up -d --build
+```
+
 ## Web UI Settings
 
 After login, the header contains a small settings button.
@@ -142,8 +184,10 @@ Proxy is disabled by default.
 | `YTDLP_PROXY_MODE` | `foreign-only` | Initial proxy mode on first startup |
 | `YTDLP_ADMIN_PASSWORD` | unset | Enables login protection |
 | `YTDLP_SESSION_SECRET` | dev fallback | Session signing secret |
+| `YTDLP_SESSION_DOMAIN` | unset | Optional cookie domain for login sessions |
 | `YTDLP_SESSION_SECURE` | `false` | Set `true` behind HTTPS |
 | `YTDLP_SESSION_MAX_AGE` | `43200` | Session lifetime in seconds |
+| `YTDLP_ALLOWED_HOSTS` | `*` | Comma-separated allowed `Host` headers for domain deployments |
 
 ## Repository Layout
 

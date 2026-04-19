@@ -45,5 +45,10 @@ SESSION_SECRET = _read_env(
 SESSION_COOKIE_NAME = _read_env(
     "YTDLP_SESSION_COOKIE_NAME", "ytdlp_web_session"
 )
+SESSION_DOMAIN = _read_env("YTDLP_SESSION_DOMAIN", "").strip() or None
 SESSION_MAX_AGE = int(_read_env("YTDLP_SESSION_MAX_AGE", "43200"))
 SESSION_SECURE = _read_bool("YTDLP_SESSION_SECURE", False)
+ALLOWED_HOSTS = [
+    host.strip() for host in _read_env("YTDLP_ALLOWED_HOSTS", "*").split(",")
+    if host.strip()
+]

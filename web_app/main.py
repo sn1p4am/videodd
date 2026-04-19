@@ -6,16 +6,19 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, RedirectResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from .auth import is_authenticated
 from .config import (
+    ALLOWED_HOSTS,
     AUTH_ENABLED,
     BASE_DIR,
     DOWNLOAD_DIR,
     HOST,
     PORT,
     SESSION_COOKIE_NAME,
+    SESSION_DOMAIN,
     SESSION_MAX_AGE,
     SESSION_SECRET,
     SESSION_SECURE,
@@ -48,10 +51,13 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,
     session_cookie=SESSION_COOKIE_NAME,
+    domain=SESSION_DOMAIN,
     max_age=SESSION_MAX_AGE,
     same_site="lax",
     https_only=SESSION_SECURE,
 )
+if ALLOWED_HOSTS != ["*"]:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 
 app.include_router(auth.router)
 app.include_router(api.router)
