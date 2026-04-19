@@ -25,7 +25,7 @@ This fork is optimized for a simple workflow:
 - Python 3.10+
 - `ffmpeg` / `ffprobe` recommended; required for merge, remux, and audio extraction tasks handled by `yt-dlp`
 - A Node runtime available in `PATH` or via `YTDLP_NODE_PATH`
-- Optional proxy if you want to route non-domestic sites through `YTDLP_PROXY_URL`
+- Optional proxy if you want to seed the initial proxy defaults through `YTDLP_PROXY_URL`
 - For public deployment, set `YTDLP_ADMIN_PASSWORD` and `YTDLP_SESSION_SECRET`
 
 ### Run from this repository
@@ -71,12 +71,14 @@ The Compose setup:
 - installs `ffmpeg` and `nodejs` in the container
 - persists downloads and the SQLite database under `./data`
 - requires an admin password and session secret from `.env`
+- defaults to direct outbound access; proxy can be enabled later in the Web UI settings modal if needed
 
 ### Current behavior to know about
 
 - `web_app` currently supports **single video URLs only**; playlists are rejected
 - Downloads default to `web_app/downloads/`
 - Download history defaults to `web_app/ytdlp_web.db`
+- Proxy is disabled by default and can be configured from the small settings button in the Web UI header
 - The UI can extract metadata, start downloads, stream progress, list history, delete records, and serve completed files
 
 ## CLI
@@ -107,6 +109,8 @@ The `web_app/` service adds a small HTTP layer around `yt-dlp`:
 - `GET /api/downloads` returns download history
 - `GET /api/downloads/{task_id}/file` serves the completed file
 - `DELETE /api/downloads/{task_id}` removes the history record and the downloaded file if it still exists
+- `GET /api/settings` returns the persisted proxy settings
+- `PUT /api/settings/proxy` updates the proxy settings used by subsequent extract/download jobs
 
 ### Screenshots
 
@@ -132,8 +136,8 @@ Representative Web UI states:
 | `YTDLP_PORT` | `8081` | FastAPI bind port |
 | `YTDLP_MAX_CONCURRENT` | `3` | Maximum concurrent background downloads |
 | `YTDLP_NODE_PATH` | auto-detect | Node runtime path or executable name |
-| `YTDLP_PROXY_URL` | unset | Proxy URL used for downloads when enabled |
-| `YTDLP_PROXY_MODE` | `foreign-only` | `foreign-only`, `always`, or `never` |
+| `YTDLP_PROXY_URL` | unset | Initial proxy URL saved on first startup; later changes can be made in the UI |
+| `YTDLP_PROXY_MODE` | `foreign-only` | Initial proxy mode saved on first startup |
 | `YTDLP_ADMIN_PASSWORD` | unset | Enables the admin login page and API protection |
 | `YTDLP_SESSION_SECRET` | dev fallback | Secret used to sign the login session cookie |
 | `YTDLP_SESSION_SECURE` | `false` | Set `true` when serving over HTTPS |
@@ -154,7 +158,7 @@ python -m web_app
 - Put the service behind HTTPS before exposing it on the public internet.
 - Change both `YTDLP_ADMIN_PASSWORD` and `YTDLP_SESSION_SECRET` from the example values.
 - Keep `YTDLP_SESSION_SECURE=true` in Docker deployments that are accessed over HTTPS.
-- If you need an outbound proxy, set `YTDLP_PROXY_URL`; otherwise leave it empty.
+- Public deployment can stay direct by default; if you later need a proxy, enable it from the header settings modal after login.
 
 ## Project structure
 

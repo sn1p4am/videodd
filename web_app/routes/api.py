@@ -1,15 +1,37 @@
 import os
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from ..auth import require_admin
 from ..models import (
-    DownloadRequest, DownloadResponse, ExtractRequest, ExtractResponse,
+    DownloadRequest,
+    DownloadResponse,
+    ExtractRequest,
+    ExtractResponse,
+    ProxySettings,
 )
 from .. import downloader, database
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_admin)])
+
+
+def _validate_proxy_settings(payload: ProxySettings) -> ProxySettings:
+    proxy_url = payload.proxy_url.strip()
+
+    if payload.proxy_enabled:
+        if not proxy_url:
+            raise HTTPException(status_code=400, detail="启用代理时必须填写代理地址")
+        parsed = urlparse(proxy_url)
+        if not parsed.scheme or not parsed.netloc:
+            raise HTTPException(status_code=400, detail="代理地址格式不正确")
+
+    return ProxySettings(
+        proxy_enabled=payload.proxy_enabled,
+        proxy_url=proxy_url,
+        proxy_mode=payload.proxy_mode,
+    )
 
 
 @router.post("/extract", response_model=ExtractResponse)
@@ -43,6 +65,22 @@ async def create_download(req: DownloadRequest):
         video_id=video_info.get("id") if video_info else None,
         title=video_info.get("title") if video_info else None,
     )
+
+
+@router.get("/settings", response_model=ProxySettings)
+async def get_settings():
+    return ProxySettings(**database.get_proxy_settings())
+
+
+@router.put("/settings/proxy", response_model=ProxySettings)
+async def update_settings(payload: ProxySettings):
+    normalized = _validate_proxy_settings(payload)
+    database.update_proxy_settings(
+        proxy_enabled=normalized.proxy_enabled,
+        proxy_url=normalized.proxy_url,
+        proxy_mode=normalized.proxy_mode,
+    )
+    return normalized
 
 
 @router.get("/downloads")

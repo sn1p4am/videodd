@@ -34,6 +34,8 @@ MAX_CONCURRENT_DOWNLOADS = int(_read_env("YTDLP_MAX_CONCURRENT", "3"))
 NODE_PATH = _read_env("YTDLP_NODE_PATH", "").strip()
 PROXY_URL = _read_env("YTDLP_PROXY_URL", "").strip()
 PROXY_MODE = _read_env("YTDLP_PROXY_MODE", "foreign-only").strip().lower()
+if PROXY_MODE not in {"foreign-only", "always", "never"}:
+    PROXY_MODE = "foreign-only"
 
 ADMIN_PASSWORD = _read_env("YTDLP_ADMIN_PASSWORD", "")
 AUTH_ENABLED = bool(ADMIN_PASSWORD)

@@ -12,10 +12,8 @@ from .config import (
     DOWNLOAD_DIR,
     MAX_CONCURRENT_DOWNLOADS,
     NODE_PATH,
-    PROXY_MODE,
-    PROXY_URL,
 )
-from .database import create_download, update_download
+from .database import create_download, get_proxy_settings, update_download
 
 # Global state
 _progress_data: dict[str, dict] = {}
@@ -79,9 +77,12 @@ def _base_ydl_opts(url: str = "") -> dict:
     if node_path:
         opts["js_runtimes"] = {"node": {"path": node_path}}
 
-    if PROXY_URL:
-        if PROXY_MODE == "always" or (PROXY_MODE != "never" and (not url or _needs_proxy(url))):
-            opts["proxy"] = PROXY_URL
+    proxy_settings = get_proxy_settings()
+    proxy_url = proxy_settings["proxy_url"].strip()
+    proxy_mode = proxy_settings["proxy_mode"]
+    if proxy_settings["proxy_enabled"] and proxy_url:
+        if proxy_mode == "always" or (proxy_mode != "never" and (not url or _needs_proxy(url))):
+            opts["proxy"] = proxy_url
 
     return opts
 

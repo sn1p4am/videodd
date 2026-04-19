@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Literal, Optional
 
 
 class LoginRequest(BaseModel):
@@ -9,6 +9,12 @@ class LoginRequest(BaseModel):
 class AuthStatusResponse(BaseModel):
     auth_enabled: bool
     authenticated: bool
+
+
+class ProxySettings(BaseModel):
+    proxy_enabled: bool = False
+    proxy_url: str = ""
+    proxy_mode: Literal["foreign-only", "always", "never"] = "foreign-only"
 
 
 class ExtractRequest(BaseModel):

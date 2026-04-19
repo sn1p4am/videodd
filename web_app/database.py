@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from .config import DB_PATH
+from .config import DB_PATH, PROXY_MODE, PROXY_URL
 
 
 def get_connection():
@@ -30,6 +30,20 @@ def init_db():
             completed_at TEXT
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    conn.executemany(
+        "INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)",
+        [
+            ("proxy_enabled", "1" if PROXY_URL else "0"),
+            ("proxy_url", PROXY_URL),
+            ("proxy_mode", PROXY_MODE),
+        ],
+    )
     conn.commit()
     conn.close()
 
@@ -98,5 +112,39 @@ def delete_download(task_id):
     if row and row["filepath"] and os.path.exists(row["filepath"]):
         os.remove(row["filepath"])
     conn.execute("DELETE FROM downloads WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_proxy_settings():
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT key, value FROM app_settings WHERE key IN ('proxy_enabled', 'proxy_url', 'proxy_mode')"
+    ).fetchall()
+    conn.close()
+
+    values = {row["key"]: row["value"] for row in rows}
+    proxy_mode = values.get("proxy_mode") or PROXY_MODE
+    if proxy_mode not in {"foreign-only", "always", "never"}:
+        proxy_mode = "foreign-only"
+
+    return {
+        "proxy_enabled": values.get("proxy_enabled", "0") == "1",
+        "proxy_url": values.get("proxy_url", ""),
+        "proxy_mode": proxy_mode,
+    }
+
+
+def update_proxy_settings(proxy_enabled: bool, proxy_url: str, proxy_mode: str):
+    conn = get_connection()
+    conn.executemany(
+        "INSERT INTO app_settings (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [
+            ("proxy_enabled", "1" if proxy_enabled else "0"),
+            ("proxy_url", proxy_url),
+            ("proxy_mode", proxy_mode),
+        ],
+    )
     conn.commit()
     conn.close()
