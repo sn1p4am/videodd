@@ -79,6 +79,14 @@ YTDLP_SESSION_SECRET=use-a-long-random-secret
 YTDLP_SESSION_SECURE=true
 ```
 
+If you are accessing the service over plain `http://` during local or temporary testing, set:
+
+```dotenv
+YTDLP_SESSION_SECURE=false
+```
+
+Use `YTDLP_SESSION_SECURE=true` only when the browser is actually accessing the site over HTTPS.
+
 Start the service:
 
 ```bash

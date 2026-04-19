@@ -9,6 +9,7 @@ class LoginRequest(BaseModel):
 class AuthStatusResponse(BaseModel):
     auth_enabled: bool
     authenticated: bool
+    session_secure: bool
 
 
 class ProxySettings(BaseModel):

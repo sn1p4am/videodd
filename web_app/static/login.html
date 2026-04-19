@@ -59,6 +59,7 @@
                        class="w-full rounded-2xl border border-white/10 bg-dark-700 px-4 py-3 text-white outline-none transition focus:border-accent"
                        placeholder="请输入管理员密码">
               </label>
+              <div id="warning" class="hidden rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-100"></div>
               <div id="error" class="hidden rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200"></div>
               <button id="submit" type="submit"
                       class="w-full rounded-2xl bg-accent px-4 py-3 font-medium text-white transition hover:bg-accent-light disabled:cursor-not-allowed disabled:opacity-60">
@@ -75,11 +76,25 @@
     const form = document.getElementById('login-form');
     const passwordInput = document.getElementById('password');
     const submitButton = document.getElementById('submit');
+    const warningBox = document.getElementById('warning');
     const errorBox = document.getElementById('error');
+
+    function setWarning(message) {
+      if (!message) {
+        warningBox.textContent = '';
+        warningBox.classList.add('hidden');
+        return;
+      }
+      warningBox.textContent = message;
+      warningBox.classList.remove('hidden');
+    }
 
     async function checkStatus() {
       const response = await fetch('/api/auth/status');
       const data = await response.json();
+      if (data.session_secure && window.location.protocol !== 'https:') {
+        setWarning('当前是 HTTP 访问，但 YTDLP_SESSION_SECURE=true。浏览器可能不会保存登录 Cookie。请改用 HTTPS，或把 .env 中的 YTDLP_SESSION_SECURE 改为 false 后重启容器。');
+      }
       if (!data.auth_enabled || data.authenticated) {
         window.location.replace('/');
       }
@@ -112,6 +127,14 @@
           throw new Error(data.detail || '登录失败');
         }
         if (data.authenticated) {
+          const statusResponse = await fetch('/api/auth/status', { cache: 'no-store' });
+          const statusData = await statusResponse.json();
+          if (!statusData.authenticated) {
+            if (statusData.session_secure && window.location.protocol !== 'https:') {
+              throw new Error('密码已验证，但浏览器没有保存登录 Cookie。当前是 HTTP 访问，请把 .env 中的 YTDLP_SESSION_SECURE 改为 false，或改用 HTTPS。');
+            }
+            throw new Error('密码已验证，但登录会话没有生效。请检查浏览器是否拦截了 Cookie。');
+          }
           window.location.replace('/');
           return;
         }
