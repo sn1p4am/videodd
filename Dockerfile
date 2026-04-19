@@ -15,7 +15,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg nodejs ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY LICENSE README.md pyproject.toml supportedsites.md /app/
+COPY LICENSE README.md pyproject.toml /app/
 COPY yt_dlp /app/yt_dlp
 COPY web_app /app/web_app
 
