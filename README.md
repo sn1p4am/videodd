@@ -73,6 +73,61 @@ The Compose setup:
 - requires an admin password and session secret from `.env`
 - defaults to direct outbound access; proxy can be enabled later in the Web UI settings modal if needed
 
+### Docker Compose deployment steps
+
+If you want to deploy this on a server with Docker Compose:
+
+1. Clone the repository on the target machine.
+2. Copy the example environment file.
+3. Set a strong admin password and session secret.
+4. Start the service with Docker Compose.
+
+Example:
+
+```bash
+git clone https://github.com/sn1p4am/videodd.git
+cd videodd
+cp .env.example .env
+```
+
+Edit `.env` and at minimum change:
+
+```dotenv
+YTDLP_PUBLIC_PORT=8081
+YTDLP_ADMIN_PASSWORD=use-a-strong-password
+YTDLP_SESSION_SECRET=use-a-long-random-secret
+YTDLP_SESSION_SECURE=true
+```
+
+Then start the service:
+
+```bash
+docker compose up -d --build
+```
+
+Useful commands:
+
+```bash
+docker compose ps
+docker compose logs -f yt-dlp-web
+docker compose restart yt-dlp-web
+docker compose down
+```
+
+To update after pulling new code:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Persistent data is stored in `./data`:
+
+- `./data/downloads` holds downloaded files
+- `./data/ytdlp_web.db` holds the SQLite history and saved proxy settings
+
+If you expose this to the public internet, put it behind HTTPS and keep `YTDLP_SESSION_SECURE=true`.
+
 ### Current behavior to know about
 
 - `web_app` currently supports **single video URLs only**; playlists are rejected
