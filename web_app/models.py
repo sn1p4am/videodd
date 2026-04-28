@@ -30,6 +30,24 @@ class BilibiliCookieUpdate(BaseModel):
     clear_cookies: bool = False
 
 
+class BilibiliQrGenerateResponse(BaseModel):
+    url: str
+    key: str
+    status: str
+    message: str
+
+
+class BilibiliQrPollRequest(BaseModel):
+    key: str
+
+
+class BilibiliQrPollResponse(BaseModel):
+    status: Literal["waiting", "scanned", "expired", "success", "error"]
+    code: int
+    message: str
+    cookie_status: Optional[BilibiliCookieStatus] = None
+
+
 class ExtractRequest(BaseModel):
     url: str
 

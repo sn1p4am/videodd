@@ -1,20 +1,23 @@
 import os
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from ..auth import require_admin
 from ..models import (
     BilibiliCookieStatus,
     BilibiliCookieUpdate,
+    BilibiliQrGenerateResponse,
+    BilibiliQrPollRequest,
+    BilibiliQrPollResponse,
     DownloadRequest,
     DownloadResponse,
     ExtractRequest,
     ExtractResponse,
     ProxySettings,
 )
-from .. import downloader, database
+from .. import bilibili_qr, downloader, database
 from ..site_cookies import normalize_bilibili_cookies
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_admin)])
@@ -119,6 +122,46 @@ async def update_bilibili_settings(payload: BilibiliCookieUpdate):
         cookies_text=cookies_text,
     )
     return BilibiliCookieStatus(**database.get_bilibili_cookie_settings())
+
+
+@router.post("/settings/bilibili/qr", response_model=BilibiliQrGenerateResponse)
+def generate_bilibili_qr(request: Request):
+    try:
+        return BilibiliQrGenerateResponse(
+            **bilibili_qr.generate_qr(request.headers.get("user-agent", ""))
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@router.post("/settings/bilibili/qr/poll", response_model=BilibiliQrPollResponse)
+def poll_bilibili_qr(payload: BilibiliQrPollRequest, request: Request):
+    try:
+        result = bilibili_qr.poll_qr(
+            payload.key,
+            request.headers.get("user-agent", ""),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    cookie_status = None
+    cookies_text = result.pop("cookies_text", "")
+    if result.get("status") == "success":
+        try:
+            normalized = normalize_bilibili_cookies(cookies_text)
+            database.update_bilibili_cookie_settings(
+                cookies_enabled=True,
+                cookies_text=normalized,
+            )
+            cookie_status = BilibiliCookieStatus(
+                **database.get_bilibili_cookie_settings()
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+    return BilibiliQrPollResponse(**result, cookie_status=cookie_status)
 
 
 @router.get("/downloads")

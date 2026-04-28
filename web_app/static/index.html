@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>yt-dlp Web</title>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -367,6 +368,37 @@
                    class="h-4 w-4 rounded border-dark-500 bg-dark-700 text-accent focus:ring-accent">
           </label>
 
+          <div class="rounded-xl border border-dark-500 bg-dark-800 px-4 py-4">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-sm text-white font-medium">扫码登录</p>
+                <p class="text-xs text-gray-500 mt-1">用 B 站 App 扫码后自动保存 Cookie。</p>
+              </div>
+              <button @click="startBilibiliQrLogin"
+                      :disabled="qrLogin.loading || qrLogin.polling"
+                      class="bg-dark-500 hover:bg-dark-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-200 px-3 py-2 rounded-lg text-sm transition-colors whitespace-nowrap">
+                {{ bilibiliQrButtonText }}
+              </button>
+            </div>
+
+            <div v-if="qrLogin.open" class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div class="relative h-36 w-36 flex-shrink-0 self-center rounded-lg bg-white p-2">
+                <canvas ref="qrCanvas" class="h-full w-full"></canvas>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm text-gray-200">{{ qrLogin.message || '等待扫码' }}</p>
+                <p v-if="qrLogin.status === 'success'" class="mt-2 text-xs text-green-300">B 站 Cookie 已覆盖保存并启用。</p>
+                <p v-else-if="qrLogin.status === 'expired'" class="mt-2 text-xs text-yellow-300">二维码已过期，可以重新生成。</p>
+                <p v-else-if="qrLogin.status === 'error'" class="mt-2 text-xs text-red-300">{{ qrLogin.error || '扫码登录失败' }}</p>
+                <button v-if="qrLogin.status === 'expired' || qrLogin.status === 'error'"
+                        @click="startBilibiliQrLogin"
+                        class="mt-3 bg-dark-500 hover:bg-dark-600 text-gray-200 px-3 py-2 rounded-lg text-sm transition-colors">
+                  重新生成
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label for="bilibili-cookies" class="block text-sm text-gray-300 mb-2">B 站 Cookie</label>
             <textarea id="bilibili-cookies" v-model="bilibiliCookieText"
@@ -408,7 +440,7 @@
 </div>
 
 <script>
-const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
+const { createApp, ref, reactive, computed, nextTick, onMounted, onUnmounted } = Vue;
 
 createApp({
   setup() {
@@ -435,6 +467,18 @@ createApp({
     const proxySettings = reactive({ proxy_enabled: false, proxy_url: '', proxy_mode: 'foreign-only' });
     const bilibiliCookies = reactive({ cookies_enabled: false, has_cookies: false, has_sessdata: false });
     const bilibiliCookieText = ref('');
+    const qrCanvas = ref(null);
+    const qrLogin = reactive({
+      open: false,
+      loading: false,
+      polling: false,
+      status: 'idle',
+      message: '',
+      error: '',
+      url: '',
+      key: '',
+    });
+    let qrPollTimer = null;
     let eventSource = null;
 
     async function apiFetch(input, init = {}) {
@@ -507,6 +551,12 @@ createApp({
       if (!bilibiliCookies.has_cookies) return '未保存 Cookie';
       if (!bilibiliCookies.has_sessdata) return '已保存 Cookie，但未检测到 SESSDATA';
       return '已保存含 SESSDATA 的 Cookie';
+    });
+
+    const bilibiliQrButtonText = computed(() => {
+      if (qrLogin.loading) return '生成中...';
+      if (qrLogin.polling) return '等待确认...';
+      return bilibiliCookies.has_cookies ? '切换 Cookie' : '扫码登录 B 站';
     });
 
     const progressStatus = computed(() => {
@@ -664,6 +714,8 @@ createApp({
       settingsError.value = '';
       settingsSaved.value = '';
       bilibiliCookieText.value = '';
+      stopBilibiliQrPolling();
+      resetBilibiliQrState();
       settingsOpen.value = true;
       loadSettings();
     }
@@ -674,6 +726,123 @@ createApp({
       settingsError.value = '';
       settingsSaved.value = '';
       bilibiliCookieText.value = '';
+      stopBilibiliQrPolling();
+    }
+
+    function resetBilibiliQrState() {
+      Object.assign(qrLogin, {
+        open: false,
+        loading: false,
+        polling: false,
+        status: 'idle',
+        message: '',
+        error: '',
+        url: '',
+        key: '',
+      });
+    }
+
+    function stopBilibiliQrPolling() {
+      if (qrPollTimer) {
+        clearTimeout(qrPollTimer);
+        qrPollTimer = null;
+      }
+      qrLogin.polling = false;
+    }
+
+    async function renderBilibiliQr() {
+      await nextTick();
+      if (!qrCanvas.value || !qrLogin.url) return;
+      if (!window.QRCode) {
+        throw new Error('二维码渲染脚本加载失败');
+      }
+      await window.QRCode.toCanvas(qrCanvas.value, qrLogin.url, {
+        width: 128,
+        margin: 1,
+        color: { dark: '#111322', light: '#ffffff' },
+      });
+    }
+
+    async function startBilibiliQrLogin() {
+      settingsError.value = '';
+      settingsSaved.value = '';
+      stopBilibiliQrPolling();
+      resetBilibiliQrState();
+      qrLogin.open = true;
+      qrLogin.loading = true;
+      qrLogin.status = 'loading';
+      qrLogin.message = '正在生成二维码...';
+
+      try {
+        const res = await apiFetch('/api/settings/bilibili/qr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '生成 B 站二维码失败');
+        Object.assign(qrLogin, {
+          loading: false,
+          polling: true,
+          status: data.status || 'waiting',
+          message: data.message || '等待扫码',
+          error: '',
+          url: data.url,
+          key: data.key,
+        });
+        await renderBilibiliQr();
+        pollBilibiliQr();
+      } catch (e) {
+        stopBilibiliQrPolling();
+        Object.assign(qrLogin, {
+          loading: false,
+          polling: false,
+          status: 'error',
+          message: '二维码生成失败',
+          error: e.message || '二维码生成失败',
+        });
+      }
+    }
+
+    async function pollBilibiliQr() {
+      if (!qrLogin.key || !qrLogin.open) return;
+
+      try {
+        const res = await apiFetch('/api/settings/bilibili/qr/poll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: qrLogin.key }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '查询 B 站扫码状态失败');
+        qrLogin.status = data.status;
+        qrLogin.message = data.message;
+
+        if (data.status === 'success') {
+          stopBilibiliQrPolling();
+          if (data.cookie_status) {
+            Object.assign(bilibiliCookies, data.cookie_status);
+          } else {
+            await loadSettings();
+          }
+          bilibiliCookies.cookies_enabled = true;
+          bilibiliCookieText.value = '';
+          settingsSaved.value = 'B 站 Cookie 已通过扫码登录更新';
+          return;
+        }
+
+        if (data.status === 'expired' || data.status === 'error') {
+          stopBilibiliQrPolling();
+          qrLogin.error = data.message;
+          return;
+        }
+
+        qrPollTimer = setTimeout(pollBilibiliQr, 2000);
+      } catch (e) {
+        stopBilibiliQrPolling();
+        qrLogin.status = 'error';
+        qrLogin.message = '扫码状态查询失败';
+        qrLogin.error = e.message || '扫码状态查询失败';
+      }
     }
 
     async function saveSettings() {
@@ -805,18 +974,23 @@ createApp({
       loadHistory();
       loadSettings();
     });
-    onUnmounted(() => { if (eventSource) eventSource.close(); });
+    onUnmounted(() => {
+      if (eventSource) eventSource.close();
+      stopBilibiliQrPolling();
+    });
 
     return {
       activeTab, url, videoInfo, extracting, downloading, errorMsg,
       downloadType, selectedQuality, selectedVideoFormat, selectedAudioFormat,
       videoQualityOptions, videoFormatOptions, audioFormatOptions,
-      proxyModeOptions, currentProxyModeDesc, bilibiliCookieStatusText,
+      proxyModeOptions, currentProxyModeDesc,
+      bilibiliCookieStatusText, bilibiliQrButtonText,
       progress, progressStatus, completed, history,
       settingsOpen, settingsSaving, settingsError, settingsSaved,
-      proxySettings, bilibiliCookies, bilibiliCookieText,
+      proxySettings, bilibiliCookies, bilibiliCookieText, qrCanvas, qrLogin,
       extractInfo, startDownload, loadHistory, loadSettings, deleteItem, reset, logout,
-      openSettings, closeSettings, saveSettings, clearBilibiliCookies,
+      openSettings, closeSettings, saveSettings,
+      clearBilibiliCookies, startBilibiliQrLogin,
       formatBytes, formatSpeed, formatNumber, formatDate, statusText,
     };
   }

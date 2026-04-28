@@ -169,7 +169,8 @@ From there you can:
 - set the proxy URL
 - choose whether the proxy applies to foreign sites only or all sites
 - enable or disable Bilibili cookies
-- paste or clear Bilibili cookies
+- scan a Bilibili login QR code to update cookies
+- paste or clear Bilibili cookies manually
 
 Proxy is disabled by default.
 
@@ -179,13 +180,19 @@ Some Bilibili videos return `HTTP 412 Precondition Failed` when requested from a
 
 To handle those cases:
 
-1. Log in to Bilibili in your browser.
-2. Open developer tools on a `bilibili.com` page and copy the request `Cookie` header, or export a Netscape `cookies.txt`.
-3. In this Web UI, open the settings button in the top right.
-4. Enable `B 站 Cookie`, paste the Cookie content, and save.
+1. In this Web UI, open the settings button in the top right.
+2. Click `扫码登录 B 站`, or `切换 Cookie` if cookies already exist.
+3. Use the Bilibili mobile app to scan and confirm login.
+4. Wait for the page to show that the Bilibili cookies were updated.
 5. Retry metadata extraction or download.
 
-Recommended Cookie content includes `SESSDATA`. If `SESSDATA` is missing, the app will still save the Cookie, but Bilibili may continue to reject the request.
+Manual fallback:
+
+1. Log in to Bilibili in your browser.
+2. Open developer tools on a `bilibili.com` page and copy the request `Cookie` header, or export a Netscape `cookies.txt`.
+3. Enable `B 站 Cookie`, paste the Cookie content, and save.
+
+Recommended cookie content includes `SESSDATA`. If `SESSDATA` is missing, the app will still save the cookie, but Bilibili may continue to reject the request.
 
 Cookies are stored in `./data/ytdlp_web.db`. Treat this file as sensitive.
 
