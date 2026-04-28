@@ -5,7 +5,7 @@ import shutil
 import uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from yt_dlp import YoutubeDL
 
@@ -69,6 +69,27 @@ def _needs_proxy(url: str) -> bool:
         return True
 
 
+def _should_force_single_video(url: str) -> bool:
+    """Treat YouTube watch/share URLs as a single video even with playlist context."""
+    try:
+        parsed = urlparse(url)
+        hostname = (parsed.hostname or "").lower()
+        if hostname in {"youtu.be", "www.youtu.be"}:
+            return bool(parsed.path.strip("/"))
+        if hostname not in {
+            "youtube.com",
+            "www.youtube.com",
+            "m.youtube.com",
+            "music.youtube.com",
+        }:
+            return False
+        if parsed.path.rstrip("/") != "/watch":
+            return False
+        return bool(parse_qs(parsed.query).get("v"))
+    except Exception:
+        return False
+
+
 def _base_ydl_opts(url: str = "") -> dict:
     opts = {
         "quiet": True,
@@ -86,6 +107,8 @@ def _base_ydl_opts(url: str = "") -> dict:
         if proxy_mode == "always" or (proxy_mode != "never" and (not url or _needs_proxy(url))):
             opts["proxy"] = proxy_url
 
+    if url and _should_force_single_video(url):
+        opts["noplaylist"] = True
     _apply_site_cookies(opts, url)
     return opts
 

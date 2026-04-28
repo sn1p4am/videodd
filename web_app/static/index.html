@@ -494,6 +494,20 @@ createApp({
       return res;
     }
 
+    async function readJsonResponse(res) {
+      const text = await res.text();
+      if (!text) return {};
+      try {
+        return JSON.parse(text);
+      } catch {
+        const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 120);
+        if (snippet.startsWith('<')) {
+          throw new Error('接口返回了 HTML 页面而不是 JSON。通常是登录失效、反向代理改写，或上游站点返回了错误页。');
+        }
+        throw new Error(`接口返回了非 JSON 内容：${snippet || '空响应'}`);
+      }
+    }
+
     const videoQualityOptions = computed(() => {
       const base = [
         { label: '最佳画质', value: 'best', desc: '自动选择最高清' },
@@ -618,7 +632,7 @@ createApp({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: url.value.trim() }),
         });
-        const data = await res.json();
+        const data = await readJsonResponse(res);
         if (!res.ok) throw new Error(data.detail || '提取失败');
         videoInfo.value = data;
       } catch (e) {
@@ -648,7 +662,7 @@ createApp({
             remux_video: pp.remux_video || '',
           }),
         });
-        const data = await res.json();
+        const data = await readJsonResponse(res);
         if (!res.ok) throw new Error(data.detail || '创建下载任务失败');
         connectSSE(data.task_id);
       } catch (e) {
@@ -686,7 +700,7 @@ createApp({
     async function loadHistory() {
       try {
         const res = await apiFetch('/api/downloads');
-        history.value = await res.json();
+        history.value = await readJsonResponse(res);
       } catch (e) { /* ignore */ }
     }
 
@@ -696,14 +710,14 @@ createApp({
           apiFetch('/api/settings'),
           apiFetch('/api/settings/bilibili'),
         ]);
-        const data = await proxyRes.json();
+        const data = await readJsonResponse(proxyRes);
         if (data.proxy_mode === 'never') {
           data.proxy_enabled = false;
           data.proxy_mode = 'foreign-only';
         }
         Object.assign(proxySettings, data);
 
-        const bilibiliData = await bilibiliRes.json();
+        const bilibiliData = await readJsonResponse(bilibiliRes);
         Object.assign(bilibiliCookies, bilibiliData);
       } catch (e) {
         settingsError.value = e.message || '加载设置失败';
@@ -778,7 +792,7 @@ createApp({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        const data = await res.json();
+        const data = await readJsonResponse(res);
         if (!res.ok) throw new Error(data.detail || '生成 B 站二维码失败');
         Object.assign(qrLogin, {
           loading: false,
@@ -812,7 +826,7 @@ createApp({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key: qrLogin.key }),
         });
-        const data = await res.json();
+        const data = await readJsonResponse(res);
         if (!res.ok) throw new Error(data.detail || '查询 B 站扫码状态失败');
         qrLogin.status = data.status;
         qrLogin.message = data.message;
@@ -860,7 +874,7 @@ createApp({
             proxy_mode: proxySettings.proxy_mode,
           }),
         });
-        const proxyData = await proxyRes.json();
+        const proxyData = await readJsonResponse(proxyRes);
         if (!proxyRes.ok) throw new Error(proxyData.detail || '保存代理设置失败');
         Object.assign(proxySettings, proxyData);
 
@@ -873,7 +887,7 @@ createApp({
             clear_cookies: false,
           }),
         });
-        const bilibiliData = await bilibiliRes.json();
+        const bilibiliData = await readJsonResponse(bilibiliRes);
         if (!bilibiliRes.ok) throw new Error(bilibiliData.detail || '保存 B 站 Cookie 失败');
         Object.assign(bilibiliCookies, bilibiliData);
         bilibiliCookieText.value = '';
@@ -903,7 +917,7 @@ createApp({
             clear_cookies: true,
           }),
         });
-        const data = await res.json();
+        const data = await readJsonResponse(res);
         if (!res.ok) throw new Error(data.detail || '清空 B 站 Cookie 失败');
         Object.assign(bilibiliCookies, data);
         bilibiliCookieText.value = '';
