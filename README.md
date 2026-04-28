@@ -17,6 +17,7 @@ It removes upstream CI, tests, release tooling, and other maintenance assets tha
 - Background downloads with SSE progress updates
 - Download history stored in SQLite
 - Optional proxy settings managed from the Web UI
+- Optional Bilibili cookie settings for login-required or anti-bot-gated videos
 - Standard `yt-dlp` Python package and CLI remain available
 
 ## Local Run
@@ -112,7 +113,7 @@ docker compose up -d --build
 Persistent data lives in `./data`:
 
 - `./data/downloads` for finished downloads
-- `./data/ytdlp_web.db` for history and saved proxy settings
+- `./data/ytdlp_web.db` for history, proxy settings, and saved site cookies
 
 If you expose the service publicly, put it behind HTTPS and keep `YTDLP_SESSION_SECURE=true`.
 
@@ -167,8 +168,26 @@ From there you can:
 - enable or disable an outbound proxy
 - set the proxy URL
 - choose whether the proxy applies to foreign sites only or all sites
+- enable or disable Bilibili cookies
+- paste or clear Bilibili cookies
 
 Proxy is disabled by default.
+
+### Bilibili Downloads
+
+Some Bilibili videos return `HTTP 412 Precondition Failed` when requested from a server without a browser login session. This is usually Bilibili anti-bot or login-state gating, not a Docker or ffmpeg problem.
+
+To handle those cases:
+
+1. Log in to Bilibili in your browser.
+2. Open developer tools on a `bilibili.com` page and copy the request `Cookie` header, or export a Netscape `cookies.txt`.
+3. In this Web UI, open the settings button in the top right.
+4. Enable `B 站 Cookie`, paste the Cookie content, and save.
+5. Retry metadata extraction or download.
+
+Recommended Cookie content includes `SESSDATA`. If `SESSDATA` is missing, the app will still save the Cookie, but Bilibili may continue to reject the request.
+
+Cookies are stored in `./data/ytdlp_web.db`. Treat this file as sensitive.
 
 ## Environment Variables
 

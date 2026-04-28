@@ -1,4 +1,5 @@
 import asyncio
+import io
 import os
 import shutil
 import uuid
@@ -14,6 +15,7 @@ from .config import (
     NODE_PATH,
 )
 from .database import create_download, get_proxy_settings, update_download
+from .site_cookies import is_bilibili_url
 
 # Global state
 _progress_data: dict[str, dict] = {}
@@ -84,7 +86,43 @@ def _base_ydl_opts(url: str = "") -> dict:
         if proxy_mode == "always" or (proxy_mode != "never" and (not url or _needs_proxy(url))):
             opts["proxy"] = proxy_url
 
+    _apply_site_cookies(opts, url)
     return opts
+
+
+def _apply_site_cookies(opts: dict, url: str):
+    if not url or not is_bilibili_url(url):
+        return
+
+    from .database import get_bilibili_cookie_settings
+
+    settings = get_bilibili_cookie_settings(include_secret=True)
+    cookie_text = settings.get("cookies_text", "").strip()
+    if settings.get("cookies_enabled") and cookie_text:
+        opts["cookiefile"] = io.StringIO(cookie_text)
+
+
+def _friendly_error(url: str, error: Exception) -> str:
+    message = str(error)
+    if is_bilibili_url(url) and "HTTP Error 412" in message:
+        from .database import get_bilibili_cookie_settings
+
+        settings = get_bilibili_cookie_settings(include_secret=True)
+        if not settings.get("cookies_enabled") or not settings.get("has_cookies"):
+            return (
+                "B 站返回 HTTP 412，通常是风控拦截。请在右上角设置里启用 "
+                "B 站 Cookie，并粘贴已登录账号的 bilibili.com Cookie 后重试。"
+            )
+        if not settings.get("has_sessdata"):
+            return (
+                "B 站返回 HTTP 412。当前保存的 Cookie 里没有 SESSDATA，"
+                "请复制登录后的 bilibili.com Cookie 后重试。"
+            )
+        return (
+            "B 站返回 HTTP 412。当前 Cookie 可能已过期，或服务器出口被 B 站限制；"
+            "请重新登录 B 站刷新 Cookie 后再试。"
+        )
+    return message
 
 
 def extract_video_info(url: str) -> dict:
@@ -93,11 +131,14 @@ def extract_video_info(url: str) -> dict:
         **_base_ydl_opts(url),
         "extract_flat": False,
     }
-    with YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        if info is None:
-            raise ValueError("无法提取视频信息")
-        info = ydl.sanitize_info(info)
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if info is None:
+                raise ValueError("无法提取视频信息")
+            info = ydl.sanitize_info(info)
+    except Exception as e:
+        raise RuntimeError(_friendly_error(url, e)) from e
 
     # Reject playlists for now
     if info.get("_type") == "playlist":
@@ -266,6 +307,6 @@ def _run_download(task_id: str, url: str, format_str: str,
         })
 
     except Exception as e:
-        error_msg = str(e)
+        error_msg = _friendly_error(url, e)
         update_download(task_id, "error", error=error_msg)
         _notify(task_id, {"status": "error", "error": error_msg})

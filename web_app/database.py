@@ -1,6 +1,8 @@
-import sqlite3
 import os
+import sqlite3
+
 from .config import DB_PATH, PROXY_MODE, PROXY_URL
+from .site_cookies import has_sessdata
 
 
 def get_connection():
@@ -42,6 +44,8 @@ def init_db():
             ("proxy_enabled", "1" if PROXY_URL else "0"),
             ("proxy_url", PROXY_URL),
             ("proxy_mode", PROXY_MODE),
+            ("bilibili_cookies_enabled", "0"),
+            ("bilibili_cookies", ""),
         ],
     )
     conn.commit()
@@ -145,6 +149,44 @@ def update_proxy_settings(proxy_enabled: bool, proxy_url: str, proxy_mode: str):
             ("proxy_url", proxy_url),
             ("proxy_mode", proxy_mode),
         ],
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_bilibili_cookie_settings(include_secret: bool = False):
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT key, value FROM app_settings "
+        "WHERE key IN ('bilibili_cookies_enabled', 'bilibili_cookies')"
+    ).fetchall()
+    conn.close()
+
+    values = {row["key"]: row["value"] for row in rows}
+    cookie_text = values.get("bilibili_cookies", "")
+    result = {
+        "cookies_enabled": values.get("bilibili_cookies_enabled", "0") == "1",
+        "has_cookies": bool(cookie_text.strip()),
+        "has_sessdata": has_sessdata(cookie_text),
+    }
+    if include_secret:
+        result["cookies_text"] = cookie_text
+    return result
+
+
+def update_bilibili_cookie_settings(
+    cookies_enabled: bool,
+    cookies_text: str | None = None,
+):
+    rows = [("bilibili_cookies_enabled", "1" if cookies_enabled else "0")]
+    if cookies_text is not None:
+        rows.append(("bilibili_cookies", cookies_text))
+
+    conn = get_connection()
+    conn.executemany(
+        "INSERT INTO app_settings (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        rows,
     )
     conn.commit()
     conn.close()

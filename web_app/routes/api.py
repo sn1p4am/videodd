@@ -6,6 +6,8 @@ from fastapi.responses import FileResponse
 
 from ..auth import require_admin
 from ..models import (
+    BilibiliCookieStatus,
+    BilibiliCookieUpdate,
     DownloadRequest,
     DownloadResponse,
     ExtractRequest,
@@ -13,6 +15,7 @@ from ..models import (
     ProxySettings,
 )
 from .. import downloader, database
+from ..site_cookies import normalize_bilibili_cookies
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_admin)])
 
@@ -81,6 +84,41 @@ async def update_settings(payload: ProxySettings):
         proxy_mode=normalized.proxy_mode,
     )
     return normalized
+
+
+@router.get("/settings/bilibili", response_model=BilibiliCookieStatus)
+async def get_bilibili_settings():
+    return BilibiliCookieStatus(**database.get_bilibili_cookie_settings())
+
+
+@router.put("/settings/bilibili", response_model=BilibiliCookieStatus)
+async def update_bilibili_settings(payload: BilibiliCookieUpdate):
+    current = database.get_bilibili_cookie_settings(include_secret=True)
+    cookies_text = None
+
+    if payload.clear_cookies:
+        cookies_text = ""
+        payload.cookies_enabled = False
+    elif payload.cookies_text.strip():
+        try:
+            cookies_text = normalize_bilibili_cookies(payload.cookies_text)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    effective_cookie_text = (
+        cookies_text if cookies_text is not None else current.get("cookies_text", "")
+    )
+    if payload.cookies_enabled and not effective_cookie_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="启用 B 站 Cookie 前，请先粘贴 Cookie 内容",
+        )
+
+    database.update_bilibili_cookie_settings(
+        cookies_enabled=payload.cookies_enabled,
+        cookies_text=cookies_text,
+    )
+    return BilibiliCookieStatus(**database.get_bilibili_cookie_settings())
 
 
 @router.get("/downloads")

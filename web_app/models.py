@@ -18,6 +18,18 @@ class ProxySettings(BaseModel):
     proxy_mode: Literal["foreign-only", "always", "never"] = "foreign-only"
 
 
+class BilibiliCookieStatus(BaseModel):
+    cookies_enabled: bool = False
+    has_cookies: bool = False
+    has_sessdata: bool = False
+
+
+class BilibiliCookieUpdate(BaseModel):
+    cookies_enabled: bool = False
+    cookies_text: str = ""
+    clear_cookies: bool = False
+
+
 class ExtractRequest(BaseModel):
     url: str
 
