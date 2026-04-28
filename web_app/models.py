@@ -33,6 +33,7 @@ class BilibiliCookieUpdate(BaseModel):
 class BilibiliQrGenerateResponse(BaseModel):
     url: str
     key: str
+    qr_svg: str
     status: str
     message: str
 

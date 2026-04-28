@@ -40,6 +40,7 @@ def generate_qr(user_agent: str = "") -> dict:
     return {
         "url": url,
         "key": key,
+        "qr_svg": _make_qr_svg(url),
         "status": "waiting",
         "message": "等待扫码",
     }
@@ -96,6 +97,19 @@ def _request_json(url: str, *, query: dict[str, str], user_agent: str) -> dict:
 def _read_json_response(response) -> dict:
     raw = response.read().decode("utf-8")
     return json.loads(raw)
+
+
+def _make_qr_svg(data: str) -> str:
+    import qrcode
+    import qrcode.image.svg
+
+    image = qrcode.make(
+        data,
+        image_factory=qrcode.image.svg.SvgPathImage,
+        box_size=6,
+        border=2,
+    )
+    return image.to_string(encoding="unicode")
 
 
 def _headers(user_agent: str) -> dict[str, str]:

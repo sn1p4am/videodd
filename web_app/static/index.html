@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>yt-dlp Web</title>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -35,6 +34,7 @@
       background-size: 1rem 1rem;
       animation: progress-stripe 0.5s linear infinite;
     }
+    .qr-svg svg { width: 100%; height: 100%; display: block; }
   </style>
 </head>
 <body class="dark bg-dark-800 text-gray-200 min-h-screen">
@@ -51,9 +51,9 @@
               title="管理设置"
               aria-label="管理设置">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M10.325 4.317a1.724 1.724 0 013.35 0 1.724 1.724 0 002.573 1.066 1.724 1.724 0 012.301.995 1.724 1.724 0 001.978 2.05 1.724 1.724 0 011.065 2.573 1.724 1.724 0 010 3.35 1.724 1.724 0 00-1.065 2.573 1.724 1.724 0 01-.995 2.301 1.724 1.724 0 00-2.05 1.978 1.724 1.724 0 01-2.573 1.065 1.724 1.724 0 00-3.35 0 1.724 1.724 0 01-2.573-1.065 1.724 1.724 0 00-2.301-.995 1.724 1.724 0 01-1.978-2.05 1.724 1.724 0 00-1.066-2.573 1.724 1.724 0 010-3.35 1.724 1.724 0 001.066-2.573 1.724 1.724 0 01.995-2.301 1.724 1.724 0 002.05-1.978 1.724 1.724 0 012.573-1.065z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h3m5 0h8M4 17h8m5 0h3"/>
+          <circle cx="10" cy="7" r="2" stroke-width="2"/>
+          <circle cx="15" cy="17" r="2" stroke-width="2"/>
         </svg>
       </button>
       <button @click="logout"
@@ -383,7 +383,7 @@
 
             <div v-if="qrLogin.open" class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
               <div class="relative h-36 w-36 flex-shrink-0 self-center rounded-lg bg-white p-2">
-                <canvas ref="qrCanvas" class="h-full w-full"></canvas>
+                <div v-html="qrLogin.svg" class="qr-svg h-full w-full"></div>
               </div>
               <div class="min-w-0 flex-1">
                 <p class="text-sm text-gray-200">{{ qrLogin.message || '等待扫码' }}</p>
@@ -440,7 +440,7 @@
 </div>
 
 <script>
-const { createApp, ref, reactive, computed, nextTick, onMounted, onUnmounted } = Vue;
+const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
 
 createApp({
   setup() {
@@ -467,7 +467,6 @@ createApp({
     const proxySettings = reactive({ proxy_enabled: false, proxy_url: '', proxy_mode: 'foreign-only' });
     const bilibiliCookies = reactive({ cookies_enabled: false, has_cookies: false, has_sessdata: false });
     const bilibiliCookieText = ref('');
-    const qrCanvas = ref(null);
     const qrLogin = reactive({
       open: false,
       loading: false,
@@ -477,6 +476,7 @@ createApp({
       error: '',
       url: '',
       key: '',
+      svg: '',
     });
     let qrPollTimer = null;
     let eventSource = null;
@@ -753,6 +753,7 @@ createApp({
         error: '',
         url: '',
         key: '',
+        svg: '',
       });
     }
 
@@ -762,19 +763,6 @@ createApp({
         qrPollTimer = null;
       }
       qrLogin.polling = false;
-    }
-
-    async function renderBilibiliQr() {
-      await nextTick();
-      if (!qrCanvas.value || !qrLogin.url) return;
-      if (!window.QRCode) {
-        throw new Error('二维码渲染脚本加载失败');
-      }
-      await window.QRCode.toCanvas(qrCanvas.value, qrLogin.url, {
-        width: 128,
-        margin: 1,
-        color: { dark: '#111322', light: '#ffffff' },
-      });
     }
 
     async function startBilibiliQrLogin() {
@@ -802,8 +790,9 @@ createApp({
           error: '',
           url: data.url,
           key: data.key,
+          svg: data.qr_svg || '',
         });
-        await renderBilibiliQr();
+        if (!qrLogin.svg) throw new Error('二维码生成结果为空');
         pollBilibiliQr();
       } catch (e) {
         stopBilibiliQrPolling();
@@ -1001,7 +990,7 @@ createApp({
       bilibiliCookieStatusText, bilibiliQrButtonText,
       progress, progressStatus, completed, history,
       settingsOpen, settingsSaving, settingsError, settingsSaved,
-      proxySettings, bilibiliCookies, bilibiliCookieText, qrCanvas, qrLogin,
+      proxySettings, bilibiliCookies, bilibiliCookieText, qrLogin,
       extractInfo, startDownload, loadHistory, loadSettings, deleteItem, reset, logout,
       openSettings, closeSettings, saveSettings,
       clearBilibiliCookies, startBilibiliQrLogin,

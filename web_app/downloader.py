@@ -134,7 +134,7 @@ def _friendly_error(url: str, error: Exception) -> str:
         if not settings.get("cookies_enabled") or not settings.get("has_cookies"):
             return (
                 "B 站返回 HTTP 412，通常是风控拦截。请在右上角设置里启用 "
-                "B 站 Cookie，并粘贴已登录账号的 bilibili.com Cookie 后重试。"
+                "B 站 Cookie，通过扫码登录或粘贴 Cookie 后重试。"
             )
         if not settings.get("has_sessdata"):
             return (
